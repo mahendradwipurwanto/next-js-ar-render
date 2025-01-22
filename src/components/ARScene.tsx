@@ -51,12 +51,13 @@ const ARScene: React.FC = () => {
         let model: THREE.Object3D | null = null;
 
         loader.load(
-            "/models/example.glb",
+            "/example.glb",
             (gltf) => {
                 model = gltf.scene;
                 model.scale.set(0.2, 0.2, 0.2); // Adjust scale
                 model.visible = false; // Initially invisible
                 scene.add(model);
+                console.log("Model loaded:", model); // Debugging output
             },
             undefined,
             (error) => {
@@ -71,7 +72,12 @@ const ARScene: React.FC = () => {
                     requiredFeatures: ["local", "hit-test"],
                 });
 
-                renderer.xr.setSession(session!);
+                if (!session) {
+                    console.error("AR session failed to start");
+                    return;
+                }
+
+                renderer.xr.setSession(session);
 
                 const referenceSpace = await session!.requestReferenceSpace("local");
                 const viewerSpace = await session!.requestReferenceSpace("viewer");
