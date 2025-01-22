@@ -30,7 +30,7 @@ const ARScene: React.FC = () => {
             stream.getTracks().forEach(track => track.stop()); // Stop the stream after checking
 
             // Request AR session permission
-            if (arSupported) {
+            if (navigator.xr && arSupported) {
                 const session = await navigator.xr.requestSession("immersive-ar", {
                     requiredFeatures: ["local", "hit-test"],
                 });
@@ -40,7 +40,7 @@ const ARScene: React.FC = () => {
             setPermissionGranted(true);
             setShowPermissionPopup(false); // Hide the permission popup if granted
         } catch (error) {
-            setErrorMessage("Error requesting permissions: " + error.message);
+            setErrorMessage("Error requesting permissions: " + error);
         }
     };
 
@@ -75,7 +75,7 @@ const ARScene: React.FC = () => {
         let model: THREE.Object3D | null = null;
 
         loader.load(
-            "/models/example.glb",
+            "/example.glb",
             (gltf) => {
                 model = gltf.scene;
                 model.scale.set(0.2, 0.2, 0.2); // Adjust scale
@@ -92,7 +92,11 @@ const ARScene: React.FC = () => {
         // Start AR session
         const startAR = async () => {
             try {
-                const session = await navigator.xr?.requestSession("immersive-ar", {
+                if (!navigator.xr) {
+                    throw new Error("WebXR API is not available.");
+                }
+
+                const session = await navigator.xr.requestSession("immersive-ar", {
                     requiredFeatures: ["local", "hit-test"],
                 });
 
@@ -102,20 +106,20 @@ const ARScene: React.FC = () => {
 
                 renderer.xr.setSession(session);
 
-                const referenceSpace = await session!.requestReferenceSpace("local");
-                const viewerSpace = await session!.requestReferenceSpace("viewer");
-                const hitTestSource = await session!.requestHitTestSource?.({
+                const referenceSpace = await session.requestReferenceSpace("local");
+                const viewerSpace = await session.requestReferenceSpace("viewer");
+                const hitTestSource = await session.requestHitTestSource?.({
                     space: viewerSpace,
                 });
 
-                session!.addEventListener("select", () => {
+                session.addEventListener("select", () => {
                     // Show the model when the user selects a location
                     if (model) {
                         model.visible = true;
                     }
                 });
 
-                session!.addEventListener("end", () => {
+                session.addEventListener("end", () => {
                     // Cleanup when the session ends
                     hitTestSource?.cancel();
                 });
@@ -143,12 +147,12 @@ const ARScene: React.FC = () => {
                     }
 
                     renderer.render(scene, camera);
-                    session!.requestAnimationFrame(onXRFrame);
+                    session.requestAnimationFrame(onXRFrame);
                 };
 
-                session!.requestAnimationFrame(onXRFrame);
+                session.requestAnimationFrame(onXRFrame);
             } catch (error) {
-                setErrorMessage("Failed to start AR session: " + error.message);
+                setErrorMessage("Failed to start AR session: " + error);
             }
         };
 
@@ -177,6 +181,20 @@ const ARScene: React.FC = () => {
                 >
                     <p>AR is not supported on this device/browser.</p>
                 </div>
+            ) : !permissionGranted ? (
+                <button
+                    style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        padding: "10px 20px",
+                        fontSize: "16px",
+                    }}
+                    onClick={requestPermissions}
+                >
+                    Grant Permissions
+                </button>
             ) : !sessionStarted ? (
                 <button
                     style={{
