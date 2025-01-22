@@ -1,6 +1,6 @@
-import {useEffect, useRef, useState} from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 
 const ARScene: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
@@ -8,7 +8,6 @@ const ARScene: React.FC = () => {
     const [sessionStarted, setSessionStarted] = useState(false);
 
     useEffect(() => {
-        // Check if AR is supported
         const checkARSupport = async () => {
             if (navigator.xr) {
                 const supported = await navigator.xr.isSessionSupported("immersive-ar");
@@ -24,7 +23,7 @@ const ARScene: React.FC = () => {
     useEffect(() => {
         if (!sessionStarted || !mountRef.current || !arSupported) return;
 
-        // Scene
+        // Scene setup
         const scene = new THREE.Scene();
 
         // Camera
@@ -32,12 +31,12 @@ const ARScene: React.FC = () => {
             70,
             window.innerWidth / window.innerHeight,
             0.01,
-            10
+            20
         );
-        camera.position.z = 1;
+        scene.add(camera);
 
         // Renderer
-        const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.xr.enabled = true; // Enable WebXR
@@ -49,11 +48,14 @@ const ARScene: React.FC = () => {
 
         // Load GLTF Model
         const loader = new GLTFLoader();
+        let model: THREE.Object3D | null = null;
+
         loader.load(
-            "/example.glb",
+            "/models/example.glb",
             (gltf) => {
-                const model = gltf.scene;
-                model.scale.set(0.1, 0.1, 0.1); // Scale the model
+                model = gltf.scene;
+                model.scale.set(0.2, 0.2, 0.2); // Adjust scale
+                model.visible = false; // Initially invisible
                 scene.add(model);
             },
             undefined,
@@ -62,19 +64,60 @@ const ARScene: React.FC = () => {
             }
         );
 
-        // Animation loop
-        const animate = () => {
-            renderer.render(scene, camera);
-        };
-        renderer.setAnimationLoop(animate);
-
         // Start AR session
         const startAR = async () => {
             try {
                 const session = await navigator.xr?.requestSession("immersive-ar", {
-                    requiredFeatures: ["local"],
+                    requiredFeatures: ["local", "hit-test"],
                 });
+
                 renderer.xr.setSession(session!);
+
+                const referenceSpace = await session!.requestReferenceSpace("local");
+                const viewerSpace = await session!.requestReferenceSpace("viewer");
+                const hitTestSource = await session!.requestHitTestSource?.({
+                    space: viewerSpace,
+                });
+
+                session!.addEventListener("select", () => {
+                    // Show the model when the user selects a location
+                    if (model) {
+                        model.visible = true;
+                    }
+                });
+
+                session!.addEventListener("end", () => {
+                    // Cleanup when the session ends
+                    hitTestSource?.cancel();
+                });
+
+                const onXRFrame = (time: number, frame: XRFrame) => {
+                    const xrViewerPose = frame.getViewerPose(referenceSpace);
+                    if (xrViewerPose && hitTestSource) {
+                        const hitTestResults = frame.getHitTestResults(hitTestSource);
+                        if (hitTestResults.length > 0) {
+                            const hitPose = hitTestResults[0].getPose(referenceSpace);
+                            if (hitPose && model) {
+                                model.position.set(
+                                    hitPose.transform.position.x,
+                                    hitPose.transform.position.y,
+                                    hitPose.transform.position.z
+                                );
+                                model.quaternion.set(
+                                    hitPose.transform.orientation.x,
+                                    hitPose.transform.orientation.y,
+                                    hitPose.transform.orientation.z,
+                                    hitPose.transform.orientation.w
+                                );
+                            }
+                        }
+                    }
+
+                    renderer.render(scene, camera);
+                    session!.requestAnimationFrame(onXRFrame);
+                };
+
+                session!.requestAnimationFrame(onXRFrame);
             } catch (error) {
                 console.error("Failed to start AR session:", error);
             }
@@ -92,7 +135,7 @@ const ARScene: React.FC = () => {
     }, [sessionStarted, arSupported]);
 
     return (
-        <div style={{width: "100%", height: "100vh"}}>
+        <div style={{ width: "100%", height: "100vh" }}>
             {!arSupported ? (
                 <div
                     style={{
@@ -120,7 +163,7 @@ const ARScene: React.FC = () => {
                     Start AR
                 </button>
             ) : null}
-            <div ref={mountRef}/>
+            <div ref={mountRef} />
         </div>
     );
 };
