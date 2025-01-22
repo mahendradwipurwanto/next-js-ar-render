@@ -169,6 +169,26 @@ const ARScene: React.FC = () => {
                     Start AR
                 </button>
             ) : null}
+
+            {/* Placeholder square for camera feed */}
+            <div
+                style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    width: "80%",
+                    height: "80%",
+                    backgroundColor: "rgba(255, 255, 255, 0.7)", // Semi-transparent white for visibility
+                    border: "2px dashed #000", // Dotted border to represent camera area
+                    textAlign: "center",
+                    lineHeight: "80vh",
+                    color: "#000",
+                }}
+            >
+                Camera Feed
+            </div>
+
             <div ref={mountRef} />
         </div>
     );
