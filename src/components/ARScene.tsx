@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
 
 const ARScene: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
@@ -25,8 +25,19 @@ const ARScene: React.FC = () => {
 
     const requestPermissions = async () => {
         try {
+            // Check if AR is supported in the browser/device
+            if (!navigator.xr) {
+                throw new Error("WebXR is not supported in this browser.");
+            }
+
+            // Check if the immersive-ar session type is supported
+            const isSupported = await navigator.xr.isSessionSupported("immersive-ar");
+            if (!isSupported) {
+                throw new Error("immersive-ar session is not supported on this device.");
+            }
+
             // Request camera permission (navigator.mediaDevices.getUserMedia is used to request camera)
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const stream = await navigator.mediaDevices.getUserMedia({video: true});
             stream.getTracks().forEach(track => track.stop()); // Stop the stream after checking
 
             // Request AR session permission
@@ -41,6 +52,7 @@ const ARScene: React.FC = () => {
             setShowPermissionPopup(false); // Hide the permission popup if granted
         } catch (error) {
             setErrorMessage("Error requesting permissions: " + error);
+            console.error(error);
         }
     };
 
@@ -60,7 +72,7 @@ const ARScene: React.FC = () => {
         scene.add(camera);
 
         // Renderer
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.xr.enabled = true; // Enable WebXR
@@ -93,15 +105,22 @@ const ARScene: React.FC = () => {
         const startAR = async () => {
             try {
                 if (!navigator.xr) {
-                    throw new Error("WebXR API is not available.");
+                    throw new Error("WebXR is not available on this device.");
                 }
 
+                // Check if immersive-ar session and required features are supported
+                const isImmersiveSupported = await navigator.xr.isSessionSupported("immersive-ar");
+                if (!isImmersiveSupported) {
+                    throw new Error("immersive-ar session is not supported.");
+                }
+
+                // Request session with features
                 const session = await navigator.xr.requestSession("immersive-ar", {
                     requiredFeatures: ["local", "hit-test"],
                 });
 
                 if (!session) {
-                    throw new Error("AR session failed to start");
+                    throw new Error("Failed to start AR session.");
                 }
 
                 renderer.xr.setSession(session);
@@ -113,14 +132,12 @@ const ARScene: React.FC = () => {
                 });
 
                 session.addEventListener("select", () => {
-                    // Show the model when the user selects a location
                     if (model) {
                         model.visible = true;
                     }
                 });
 
                 session.addEventListener("end", () => {
-                    // Cleanup when the session ends
                     hitTestSource?.cancel();
                 });
 
@@ -152,7 +169,8 @@ const ARScene: React.FC = () => {
 
                 session.requestAnimationFrame(onXRFrame);
             } catch (error) {
-                setErrorMessage("Failed to start AR session: " + error);
+                setErrorMessage("Failed to start AR session: " + error.message);
+                console.error(error);
             }
         };
 
@@ -168,7 +186,7 @@ const ARScene: React.FC = () => {
     }, [sessionStarted, arSupported]);
 
     return (
-        <div style={{ width: "100%", height: "100vh" }}>
+        <div style={{width: "100%", height: "100vh"}}>
             {!arSupported ? (
                 <div
                     style={{
@@ -301,7 +319,7 @@ const ARScene: React.FC = () => {
                 Camera Feed
             </div>
 
-            <div ref={mountRef} />
+            <div ref={mountRef}/>
         </div>
     );
 };
