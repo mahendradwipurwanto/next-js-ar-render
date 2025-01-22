@@ -6,6 +6,9 @@ const ARScene: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const [arSupported, setArSupported] = useState(false);
     const [sessionStarted, setSessionStarted] = useState(false);
+    const [permissionGranted, setPermissionGranted] = useState(false);
+    const [showPermissionPopup, setShowPermissionPopup] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         const checkARSupport = async () => {
@@ -19,6 +22,27 @@ const ARScene: React.FC = () => {
 
         checkARSupport();
     }, []);
+
+    const requestPermissions = async () => {
+        try {
+            // Request camera permission (navigator.mediaDevices.getUserMedia is used to request camera)
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop()); // Stop the stream after checking
+
+            // Request AR session permission
+            if (arSupported) {
+                const session = await navigator.xr.requestSession("immersive-ar", {
+                    requiredFeatures: ["local", "hit-test"],
+                });
+                session.end(); // End session immediately if permission granted
+            }
+
+            setPermissionGranted(true);
+            setShowPermissionPopup(false); // Hide the permission popup if granted
+        } catch (error) {
+            setErrorMessage("Error requesting permissions: " + error.message);
+        }
+    };
 
     useEffect(() => {
         if (!sessionStarted || !mountRef.current || !arSupported) return;
@@ -51,7 +75,7 @@ const ARScene: React.FC = () => {
         let model: THREE.Object3D | null = null;
 
         loader.load(
-            "/example.glb",
+            "/models/example.glb",
             (gltf) => {
                 model = gltf.scene;
                 model.scale.set(0.2, 0.2, 0.2); // Adjust scale
@@ -61,7 +85,7 @@ const ARScene: React.FC = () => {
             },
             undefined,
             (error) => {
-                console.error("Error loading GLTF model:", error);
+                setErrorMessage("Error loading GLTF model: " + error.message);
             }
         );
 
@@ -73,8 +97,7 @@ const ARScene: React.FC = () => {
                 });
 
                 if (!session) {
-                    console.error("AR session failed to start");
-                    return;
+                    throw new Error("AR session failed to start");
                 }
 
                 renderer.xr.setSession(session);
@@ -125,7 +148,7 @@ const ARScene: React.FC = () => {
 
                 session!.requestAnimationFrame(onXRFrame);
             } catch (error) {
-                console.error("Failed to start AR session:", error);
+                setErrorMessage("Failed to start AR session: " + error.message);
             }
         };
 
@@ -169,6 +192,77 @@ const ARScene: React.FC = () => {
                     Start AR
                 </button>
             ) : null}
+
+            {/* Permission pop-up */}
+            {showPermissionPopup && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        padding: "20px",
+                        background: "rgba(0, 0, 0, 0.8)",
+                        borderRadius: "10px",
+                        color: "white",
+                        textAlign: "center",
+                        zIndex: 1000,
+                    }}
+                >
+                    <h2>Permissions Required</h2>
+                    <p>
+                        This application requires access to your camera and AR functionality to
+                        provide the augmented reality experience.
+                    </p>
+                    <button
+                        onClick={requestPermissions}
+                        style={{
+                            padding: "10px 20px",
+                            backgroundColor: "#00aaff",
+                            border: "none",
+                            color: "white",
+                            cursor: "pointer",
+                            borderRadius: "5px",
+                        }}
+                    >
+                        Grant Permissions
+                    </button>
+                </div>
+            )}
+
+            {/* Error Pop-up */}
+            {errorMessage && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "20%",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        padding: "20px",
+                        background: "rgba(255, 0, 0, 0.8)",
+                        borderRadius: "10px",
+                        color: "white",
+                        textAlign: "center",
+                        zIndex: 1000,
+                    }}
+                >
+                    <h2>Error</h2>
+                    <p>{errorMessage}</p>
+                    <button
+                        onClick={() => setErrorMessage(null)} // Close the error pop-up
+                        style={{
+                            padding: "10px 20px",
+                            backgroundColor: "#ff4444",
+                            border: "none",
+                            color: "white",
+                            cursor: "pointer",
+                            borderRadius: "5px",
+                        }}
+                    >
+                        Close
+                    </button>
+                </div>
+            )}
 
             {/* Placeholder square for camera feed */}
             <div
